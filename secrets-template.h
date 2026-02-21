@@ -1,7 +1,7 @@
 #pragma once
 
 /*
-This file is read by the node.
+This file is read by the node and needs to be renamed to: "secrets.h".
 Enter your credentials and make sure it is added to .gitignore.
 */
 
