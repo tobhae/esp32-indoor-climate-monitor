@@ -19,14 +19,37 @@ const char* token = INFLUX_TOKEN;
 
 Adafruit_BME280 bme;
 
-// TODO: Review code
+/*
+TODO [Architecture]:
+- Refactor WiFi and HTTP logic into dedicated functions to separate networking from sensor logic.
+- Move InfluxDB Line Protocol construction into its own function to simplify loop() and improve readability.
+- Remove Serial.print's that might be redudant, and maybe even replace some with a compile-time DEBUG flag.
+
+TODO [Performance]:
+- Replace blocking delay() with non-blocking timing (millis()) if continious runtime mode is required.
+- Optimize HTTP request handling and reduce repeated object creation
+  * Pre-build the static URL once.
+  * Use a stack buffer instead of String when building the payload.
+
+TODO [Power]:
+- Implement deep sleep between sampling (just using delay() for testing right now) to increase battery-life when deployed.
+- Evaluate disabling WiFi immediately after successful transmission.
+- Change sampling interval from every 10 seconds to every 30 minutes when deploying.
+
+TODO [Portability]:
+- Consider moving location (InfluxDB Line Protocol) to a configurable constant or secrets/config file for easier deployment of multiple nodes.
+- Might migrate to ESP8266 due to implications when designing an enclosure for the ESP32 (missing screwholes on the board, cost, etc.).
+  * Replace WiFi.h with ESP8266WiFi.h
+  * Adjust HTTP client usage
+  * Update deep sleep implementation
+*/
 
 void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  // SDA = GPIO21, SCL = GPIO22
-  Wire.begin(21, 22);  
+  /* SDA = GPIO21, SCL = GPIO22 */
+  Wire.begin(21, 22);
 
   Serial.println("Connecting to WiFi...");
   WiFi.begin(ssid, password);
@@ -57,12 +80,19 @@ void loop() {
 
   Serial.println("Sending data to InfluxDB.");
 
+  /*
+  WiFi debugging
+  3 = connected
+  6 = disconnected
+  */
   Serial.print("WiFi status: ");
-  Serial.println(WiFi.status()); // 3 = connected, 6 = disconnected
+  Serial.println(WiFi.status());
 
   send_to_influx(temperature, humidity, pressure);
 
-  delay(10000); // Send every 10 seconds
+  
+  /* Send data every 10 sec. */
+  delay(10000);
 
 }
 
@@ -82,7 +112,17 @@ void send_to_influx(float temp, float hum, float pres) {
   http.addHeader("Authorization", "Token " + String(INFLUX_TOKEN));
   http.addHeader("Content-Type", "text/plain; charset=utf-8");
 
-  // InfluxDB line protocol, edit first line when deploying
+  /*
+  InfluxDB Line Protocol format:
+
+  measurement, tag=value field1=value1, field2=value2, field3=value3
+
+  NOTE:
+  - The measurement name is required by InfluxDB and groups related metrics logically.
+  - The tag describes which location the node is deployed in, e.g. kitchen, bathroom, bedroom, or livingroom.
+  - The fields corresponds to each metric collected, i.e. temperature, humidity, and pressure.
+  */
+
   String data = "environment,location=livingroom ";
   data += "temperature=" + String(temp);
   data += ",humidity=" + String(hum);
