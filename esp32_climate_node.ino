@@ -53,7 +53,7 @@ void loop() {
 
   float temperature = bme.readTemperature();
   float humidity = bme.readHumidity();
-  float pressure = bme.readPressure();
+  float pressure = bme.readPressure() / 100.0F;
 
   Serial.println("Sending data to InfluxDB.");
 
