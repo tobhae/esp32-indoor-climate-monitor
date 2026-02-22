@@ -3,9 +3,12 @@
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
+#include <esp_sleep.h>
 #include <secrets.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)
+#define uS_TO_S_FACTOR 1000000ULL
+#define TIME_TO_SLEEP (15) /* Low value for testing*/
 
 // Wifi config
 const char* ssid = WIFI_SSID;
@@ -26,14 +29,11 @@ TODO [Architecture]:
 - Remove Serial.print's that might be redudant, and maybe even replace some with a compile-time DEBUG flag.
 
 TODO [Performance]:
-- Replace blocking delay() with non-blocking timing (millis()) if continious runtime mode is required.
 - Optimize HTTP request handling and reduce repeated object creation
   * Pre-build the static URL once.
   * Use a stack buffer instead of String when building the payload.
 
 TODO [Power]:
-- Implement deep sleep between sampling (just using delay() for testing right now) to increase battery-life when deployed.
-- Evaluate disabling WiFi immediately after successful transmission.
 - Change sampling interval from every 10 seconds to every 30 minutes when deploying.
 
 TODO [Portability]:
@@ -51,52 +51,53 @@ void setup() {
   /* SDA = GPIO21, SCL = GPIO22 */
   Wire.begin(21, 22);
 
-  Serial.println("Connecting to WiFi...");
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED); {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("\nWiFi connected!");
-  Serial.println(WiFi.localIP());
-
-  Serial.println("Starting BME280...");
-
   if (!bme.begin(0x76) && !bme.begin(0x77)) {
     Serial.println("BME280 not found.");
     while (1);
   }
 
   Serial.println("BME280 ready.");
-}
 
-void loop() {
+  connect_wifi();
 
+  /* Initialize metrics */
   float temperature = bme.readTemperature();
   float humidity = bme.readHumidity();
   float pressure = bme.readPressure() / 100.0F;
 
-  Serial.println("Sending data to InfluxDB.");
+  post_influxdb(temperature, humidity, pressure);
 
-  /*
-  WiFi debugging
-  3 = connected
-  6 = disconnected
-  */
-  Serial.print("WiFi status: ");
-  Serial.println(WiFi.status());
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
 
-  send_to_influx(temperature, humidity, pressure);
-
-  
-  /* Send data every 10 sec. */
-  delay(10000);
-
+  Serial.println("Data sent to InfluxDB, going to sleep.");
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  esp_deep_sleep_start();
 }
 
-void send_to_influx(float temp, float hum, float pres) {
+void connect_wifi() {
+  WiFi.begin(ssid, password);
+
+  unsigned long start = millis();
+  const unsigned long timeout = 15000;
+
+  while (WiFi.status() != WL_CONNECTED && millis() - start < timeout) {
+    delay(500);
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi failed, sleeping anyway.");
+    esp_deep_sleep_start();
+  } else {
+    Serial.println("Connected to WiFi.");
+  }
+}
+
+void loop() {
+  /* Function unused. Execution cycle occurs entirely in setup() and enters deep sleep when finished. */
+}
+
+void post_influxdb(float temp, float hum, float pres) {
 
   if (WiFi.status() != WL_CONNECTED) {
   Serial.println("WiFi not connected!");
@@ -127,11 +128,6 @@ void send_to_influx(float temp, float hum, float pres) {
   data += "temperature=" + String(temp);
   data += ",humidity=" + String(hum);
   data += ",pressure=" + String(pres);
-
-  int httpResponseCode = http.POST(data);
-
-  Serial.print("HTTP Response: ");
-  Serial.println(httpResponseCode);
 
   http.end();
 }
