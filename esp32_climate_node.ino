@@ -15,10 +15,10 @@ const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
 
 // InfluxDB config
-const char* host = INFLUX_HOST;
-const char* org = INFLUX_ORG;
-const char* bucket = INFLUX_BUCKET;
-const char* token = INFLUX_TOKEN;
+const char* influx_host = INFLUX_HOST;
+const char* influx_org = INFLUX_ORG;
+const char* influx_bucket = INFLUX_BUCKET;
+const char* influx_token = INFLUX_TOKEN;
 
 char influx_url[256];
 
@@ -66,7 +66,7 @@ void setup() {
   snprintf(
     influx_url, sizeof(influx_url), 
     "%s/api/v2/write?org=%s&bucket=%s&precision=s", 
-    INFLUX_HOST, INFLUX_ORG, INFLUX_BUCKET);
+    influx_host, influx_org, influx_bucket);
 
   post_influxdb(temperature, humidity, pressure);
 
@@ -110,7 +110,12 @@ void post_influxdb(float temp, float hum, float pres) {
   HTTPClient http;
   http.begin(influx_url);
 
-  http.addHeader("Authorization", "Token " INFLUX_TOKEN);
+  /* Authorization header */
+  char auth_header[128];
+  snprintf(auth_header, sizeof(auth_header),
+          "Token %s", influx_token);
+
+  http.addHeader("Authorization", auth_header);
   http.addHeader("Content-Type", "text/plain; charset=utf-8");
 
   /*
