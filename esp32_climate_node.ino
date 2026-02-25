@@ -7,7 +7,6 @@
 #include <time.h>
 #include <config.h>
 
-#define SEALEVELPRESSURE_HPA (1013.25)
 #define uS_TO_S_FACTOR 1000000ULL
 #define TIME_TO_SLEEP (15) /* Low value for testing, change to 30 minutes (30 * 60) when deploying. */
 
@@ -198,7 +197,7 @@ bool build_influx_payload(char* buffer, size_t size, const ClimateData& data) {
 
   InfluxDB Line Protocol format:
 
-  measurement, tag=value field1=value1, field2=value2, field3=value3
+  measurement, tag=value field1=value1, field2=value2, field3=value3 timestamp
 
   NOTE:
   - The measurement name is required by InfluxDB and groups related metrics logically.
