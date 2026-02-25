@@ -5,13 +5,13 @@
 #include <Adafruit_BME280.h>
 #include <esp_sleep.h>
 #include <time.h>
-#include <secrets.h>
+#include <config.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)
 #define uS_TO_S_FACTOR 1000000ULL
 #define TIME_TO_SLEEP (15) /* Low value for testing, change to 30 minutes (30 * 60) when deploying. */
 
-/* WiFi credentials (defined in secrets.h) */
+/* WiFi credentials (defined in config.h) */
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
 IPAddress ip(WIFI_STATIC_IP);
@@ -19,7 +19,7 @@ IPAddress dns(WIFI_DNS);
 IPAddress gateway(WIFI_GATEWAY);
 IPAddress subnet(WIFI_SUBNET);
 
-/* InfluxDB connection parameters (defined in secrets.h) */
+/* InfluxDB connection parameters (defined in config.h) */
 const char* influx_host = INFLUX_HOST;
 const char* influx_org = INFLUX_ORG;
 const char* influx_bucket = INFLUX_BUCKET;
@@ -114,7 +114,7 @@ void init_hardware() {
 }
 
 bool connect_wifi() {
-  /* Attempts to connect to configured WiFi network (configured in secrets.h). Returns true if connection succeeds, otherwise false. */
+  /* Attempts to connect to configured WiFi network (configured in config.h). Returns true if connection succeeds, otherwise false. */
   #if USE_STATIC_IP
   WiFi.config(ip, dns, gateway, subnet);
   #endif
