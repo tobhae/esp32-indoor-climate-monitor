@@ -31,3 +31,5 @@
 #define WIFI_GATEWAY    192,168,0,1
 #define WIFI_SUBNET     255,255,255,0
 
+/* Node configuration */
+#define TIME_TO_SLEEP (15)

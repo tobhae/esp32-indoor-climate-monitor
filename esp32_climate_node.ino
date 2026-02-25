@@ -8,7 +8,6 @@
 #include <config.h>
 
 #define uS_TO_S_FACTOR 1000000ULL
-#define TIME_TO_SLEEP (15) /* Low value for testing, change to 30 minutes (30 * 60) when deploying. */
 
 /* WiFi credentials (defined in config.h) */
 const char* ssid = WIFI_SSID;
@@ -23,6 +22,9 @@ const char* influx_host = INFLUX_HOST;
 const char* influx_org = INFLUX_ORG;
 const char* influx_bucket = INFLUX_BUCKET;
 const char* influx_token = INFLUX_TOKEN;
+
+/* Node configuration (defined in config.h) */
+const char* time_to_sleep = TIME_TO_SLEEP;
 
 /* Represents a single measurement sample */
 struct ClimateData {
@@ -60,12 +62,12 @@ void setup() {
   build_influxdb_url();
 
   if(!connect_wifi()) {
-    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup(time_to_sleep * uS_TO_S_FACTOR);
     esp_deep_sleep_start();
   }
 
   if(!sync_time()) {
-    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup(time_to_sleep * uS_TO_S_FACTOR);
     esp_deep_sleep_start();
   }
 
@@ -88,7 +90,7 @@ void setup() {
 
   /* After successful transmission, enter deep sleep. */
   Serial.println("Transmission finished, going to sleep.");
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  esp_sleep_enable_timer_wakeup(time_to_sleep * uS_TO_S_FACTOR);
   esp_deep_sleep_start();
 }
 
