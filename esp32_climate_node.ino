@@ -37,9 +37,18 @@ struct ClimateData {
 char influx_url[256]; // Buffer for fully constructed InfluxDB write endpoint URL
 Adafruit_BME280 bme;  // BME280 sensor instance (I2C)
 
+/* RTC Buffer */
+#define BUFFER_CAPACITY 10
+#define PAYLOAD_SIZE 128
+RTC_DATA_ATTR char rtc_buffer[BUFFER_CAPACITY][PAYLOAD_SIZE];
+RTC_DATA_ATTR uint8_t buffer_head = 0;    // Oldest entry
+RTC_DATA_ATTR uint8_t buffer_tail = 0;    // Next write position
+RTC_DATA_ATTR uint8_t buffer_count = 0;   // Number of stored entries
+
 /*
 TODO [Architecture]:
 - Add a compile-time DEBUG flag for prints, since these prints are unncessary when the node is deployed.
+- Remove redundant config globals and use config.h macros directly.
 
 TODO [Portability]:
 - Might migrate to ESP8266 due to implications when designing an enclosure for the ESP32 (missing screwholes on the board, cost, etc.).
@@ -48,8 +57,6 @@ TODO [Portability]:
   * Update deep sleep implementation
 
 TODO [QoL]:
-- Add one retry attempt if post_influxdb fails.
-- Failed sends could be stored in a local buffer until connection to InfluxDB/WiFi is restored.
 - Consider improving the InfluxDB Line Protocol with new tags, e.g. device_id, etc.
 - Over-the-air update. If implemented, this would probably be after deployment and one of the last things to do. 
   * Would require a web server on the network where the nodes can download the new firmware from (using a periodic check).
@@ -72,16 +79,22 @@ void setup() {
 
   ClimateData data = read_climate();
 
-  char payload[128];
+  char payload[PAYLOAD_SIZE];
 
-  if (build_influx_payload(payload, sizeof(payload), data)) {
-
-    if (post_influxdb(payload, strlen(payload))) {
-      Serial.println("InfluxDB write successful.");
-    } else {
-      Serial.println("InfluxDB write failed.");
-    }
+  if (!build_influx_payload(payload, sizeof(payload), data)) {
+    esp_sleep_enable_timer_wakeup(time_to_sleep * 1000000ULL);
+    esp_deep_sleep_start();
   }
+
+  if (!flush_buffer()) {
+    buffer_push(payload);
+    esp_sleep_enable_timer_wakeup(time_to_sleep * 1000000ULL);
+    esp_deep_sleep_start();
+  }
+
+  if (!post_influxdb(payload, strlen(payload))) {
+    buffer_push(payload);
+  } 
 
   /* Shutdown WiFi */
   WiFi.disconnect(true);
@@ -89,7 +102,7 @@ void setup() {
 
   /* After successful transmission, enter deep sleep. */
   Serial.println("Transmission finished, going to sleep.");
-  esp_sleep_enable_timer_wakeup(time_to_sleep * 1000000ULL); // Convert seconds to microseconds (1s = 1 000 000µs).
+  esp_sleep_enable_timer_wakeup(time_to_sleep * 1000000ULL);
   esp_deep_sleep_start();
 }
 
@@ -237,4 +250,71 @@ bool post_influxdb(const char* payload, size_t len) {
   http.end();
 
   return (httpResponseCode == 204);
+}
+
+bool buffer_push(const char* payload) {
+  /* Store a payload in the RTC buffer, overwriting oldest entry if full */
+  if (buffer_count >= BUFFER_CAPACITY) {
+    /* Buffer full, overwrite oldest entry */
+    buffer_head = (buffer_head + 1) % BUFFER_CAPACITY;
+    buffer_count--;
+  }
+
+  strncpy(rtc_buffer[buffer_tail], payload, PAYLOAD_SIZE - 1);
+  rtc_buffer[buffer_tail][PAYLOAD_SIZE - 1] = '\0';
+
+  buffer_tail = (buffer_tail  + 1) %  BUFFER_CAPACITY;
+  buffer_count++;
+
+  /* Debugging prints */
+  Serial.print("Buffer push count: ");
+  Serial.println(buffer_count);
+
+  return true;
+}
+
+const char* buffer_peek() {
+  /* Return pointer to oldest buffered payload without removing it (nullptr if empty) */
+  if (buffer_count == 0) {
+    return nullptr;
+  }
+
+  return rtc_buffer[buffer_head];
+}
+
+void buffer_pop() {
+  /* Remove the oldest payload from the RTC buffer */
+  if (buffer_count == 0) {
+    return;
+  }
+
+  buffer_head = (buffer_head + 1) % BUFFER_CAPACITY;
+  buffer_count--;
+
+  Serial.print("Buffer entry sent and removed");
+}
+
+bool flush_buffer() {
+  /* Attempt to send all buffered payloads in FIFO order */
+  while (buffer_count > 0) {
+    const char* payload = buffer_peek();
+
+    /* Debugging prints */
+    Serial.print("Flushing entry, remaining: ");
+    Serial.println(buffer_count);
+
+    if (!post_influxdb(payload, strlen(payload))) {
+      return false;
+    }
+
+    buffer_pop();
+
+    /* Debugging prints */
+    Serial.print("Head: ");
+    Serial.println(buffer_head);
+    Serial.print("Tail: ");
+    Serial.println(buffer_tail);
+  }
+
+  return true;
 }
