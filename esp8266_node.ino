@@ -1,12 +1,11 @@
-#include <WiFi.h>
-#include <HTTPClient.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
-#include <esp_sleep.h>
 #include <time.h>
-#include <config.h>
-#include <debug.h>
+#include "config.h"
+#include "debug.h"
 
 /* Represents a single measurement sample */
 struct ClimateData {
@@ -18,28 +17,6 @@ struct ClimateData {
 /* Global runtime objets */
 char influx_url[256]; // Buffer for fully constructed InfluxDB write endpoint URL
 Adafruit_BME280 bme;  // BME280 sensor instance (I2C)
-
-/* RTC Buffer */
-#define BUFFER_CAPACITY 10
-#define PAYLOAD_SIZE 128
-RTC_DATA_ATTR char rtc_buffer[BUFFER_CAPACITY][PAYLOAD_SIZE];
-RTC_DATA_ATTR uint8_t buffer_head = 0;    // Oldest entry
-RTC_DATA_ATTR uint8_t buffer_tail = 0;    // Next write position
-RTC_DATA_ATTR uint8_t buffer_count = 0;   // Number of stored entries
-
-/*
-TODO [Portability]:
-- Might migrate to ESP8266 due to implications when designing an enclosure for the ESP32 (missing screwholes on the board, cost, etc.).
-  * Replace WiFi.h with ESP8266WiFi.h
-  * Adjust HTTP client usage
-  * Update deep sleep implementation
-
-TODO [QoL]:
-- Consider improving the InfluxDB Line Protocol with new tags, e.g. device_id, etc.
-- Over-the-air update. If implemented, this would probably be after deployment and one of the last things to do. 
-  * Would require a web server on the network where the nodes can download the new firmware from (using a periodic check).
-  * Consider implementing a firmware_version tag (InfluxDB Line Protocol) for easy tracking of not updated nodes.
-*/
 
 void setup() {
   init_hardware();
@@ -55,19 +32,14 @@ void setup() {
 
   ClimateData data = read_climate();
 
-  char payload[PAYLOAD_SIZE];
+  char payload[128];
 
   if (!build_influx_payload(payload, sizeof(payload), data)) {
     enter_deep_sleep();
   }
 
-  if (!flush_buffer()) {
-    buffer_push(payload);
-    enter_deep_sleep();
-  }
-
   if (!post_influxdb(payload, strlen(payload))) {
-    buffer_push(payload);
+    DEBUG_PRINTLN("InfluxDB write failed.");
   } 
 
   enter_deep_sleep();
@@ -81,15 +53,15 @@ void loop() {
 void init_hardware() {
   /* Initializes serial communication, I2C bus, and BME280 sensor. Halts execution if sensor initialization fails. */
   DEBUG_BLOCK({
-    
+    Serial.begin(9600);
+    delay(500);
   });
-  Serial.begin(115200);
-  delay(500);
+
   Wire.begin(I2C_SDA, I2C_SCL);
 
   if (!bme.begin(0x76) && !bme.begin(0x77)) {
     DEBUG_PRINTLN("BME280 not found.");
-    while (1);
+    enter_deep_sleep();
   }
 
   DEBUG_PRINTLN("BME280 ready.");
@@ -208,8 +180,9 @@ bool post_influxdb(const char* payload, size_t len) {
     return false;
   }
 
+  WiFiClient client;
   HTTPClient http;
-  http.begin(influx_url);
+  http.begin(client, influx_url);
 
   /* Authorization header */
   char auth_header[128];
@@ -233,75 +206,5 @@ void enter_deep_sleep() {
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
 
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * 1000000ULL);
-  esp_deep_sleep_start();
-}
-
-bool buffer_push(const char* payload) {
-  /* Store a payload in the RTC buffer, overwriting oldest entry if full */
-  if (buffer_count >= BUFFER_CAPACITY) {
-    /* Buffer full, overwrite oldest entry */
-    buffer_head = (buffer_head + 1) % BUFFER_CAPACITY;
-    buffer_count--;
-  }
-
-  strncpy(rtc_buffer[buffer_tail], payload, PAYLOAD_SIZE - 1);
-  rtc_buffer[buffer_tail][PAYLOAD_SIZE - 1] = '\0';
-
-  buffer_tail = (buffer_tail  + 1) %  BUFFER_CAPACITY;
-  buffer_count++;
-
-  /* Debugging */
-  DEBUG_PRINT("Buffer push count: ");
-  DEBUG_PRINTLN(buffer_count);
-  
-  return true;
-}
-
-const char* buffer_peek() {
-  /* Return pointer to oldest buffered payload without removing it (nullptr if empty) */
-  if (buffer_count == 0) {
-    return nullptr;
-  }
-
-  return rtc_buffer[buffer_head];
-}
-
-void buffer_pop() {
-  /* Remove the oldest payload from the RTC buffer */
-  if (buffer_count == 0) {
-    return;
-  }
-
-  buffer_head = (buffer_head + 1) % BUFFER_CAPACITY;
-  buffer_count--;
-
-  DEBUG_PRINTLN("Buffer entry sent and removed.");
-}
-
-bool flush_buffer() {
-  /* Attempt to send all buffered payloads in FIFO order */
-  while (buffer_count > 0) {
-    const char* payload = buffer_peek();
-
-    /* Debugging prints */
-    DEBUG_PRINT("Flushing entry, remaining: ");
-    DEBUG_PRINTLN(buffer_count);
-
-    if (!post_influxdb(payload, strlen(payload))) {
-      return false;
-    }
-
-    buffer_pop();
-
-    /* Debugging prints */
-    DEBUG_BLOCK({
-      Serial.print("Head: ");
-      Serial.println(buffer_head);
-      Serial.print("Tail: ");
-      Serial.println(buffer_tail);
-    });
-  }
-
-  return true;
+  ESP.deepSleep(TIME_TO_SLEEP * 1000000ULL);
 }
