@@ -68,13 +68,11 @@ void setup() {
   build_influxdb_url();
 
   if(!connect_wifi()) {
-    esp_sleep_enable_timer_wakeup(time_to_sleep * 1000000ULL);
-    esp_deep_sleep_start();
+    enter_deep_sleep();
   }
 
   if(!sync_time()) {
-    esp_sleep_enable_timer_wakeup(time_to_sleep * 1000000ULL);
-    esp_deep_sleep_start();
+    enter_deep_sleep();
   }
 
   ClimateData data = read_climate();
@@ -82,28 +80,20 @@ void setup() {
   char payload[PAYLOAD_SIZE];
 
   if (!build_influx_payload(payload, sizeof(payload), data)) {
-    esp_sleep_enable_timer_wakeup(time_to_sleep * 1000000ULL);
-    esp_deep_sleep_start();
+    enter_deep_sleep();
   }
 
   if (!flush_buffer()) {
     buffer_push(payload);
-    esp_sleep_enable_timer_wakeup(time_to_sleep * 1000000ULL);
-    esp_deep_sleep_start();
+    enter_deep_sleep();
   }
 
   if (!post_influxdb(payload, strlen(payload))) {
     buffer_push(payload);
   } 
 
-  /* Shutdown WiFi */
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
+  enter_deep_sleep();
 
-  /* After successful transmission, enter deep sleep. */
-  Serial.println("Transmission finished, going to sleep.");
-  esp_sleep_enable_timer_wakeup(time_to_sleep * 1000000ULL);
-  esp_deep_sleep_start();
 }
 
 void loop() {
@@ -250,6 +240,16 @@ bool post_influxdb(const char* payload, size_t len) {
   http.end();
 
   return (httpResponseCode == 204);
+}
+
+void enter_deep_sleep() {
+  Serial.println("Shutting down WiFi and entering deep sleep.");
+
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+
+  esp_sleep_enable_timer_wakeup(time_to_sleep * 1000000ULL);
+  esp_deep_sleep_start();
 }
 
 bool buffer_push(const char* payload) {
