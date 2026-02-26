@@ -24,8 +24,19 @@
 #define INFLUX_BUCKET   "<INFLUXDB_BUCKET>"
 #define INFLUX_TOKEN    "<INFLUXDB_TOKEN>"
 
+/* I2C configuration 
+   ESP32:   SDA = 21, SCL = 22 
+   ESP8266: SDA = 4, SCL = 5 */
+#define I2C_SDA         21
+#define I2C_SCL         22
+
+/* Node configuration */
+#define TIME_TO_SLEEP   (30 * 60)         /* Sleep interval in seconds */ 
+#define NODE_LOCATION   "<NODE_LOCATION>" /* Physical deployment location (e.g. livingroom, office, etc.) */ 
+#define NTP_SERVER      "pool.ntp.org"    /* https://www.ntppool.org/en/ */ 
+
 /* Static IP configuration
-   0 = Use DHCP 
+   0 = Use DHCP (recommended)
    1 = Use manual static IP settings below */
 #define USE_STATIC_IP   0
 
@@ -34,8 +45,3 @@
 #define WIFI_DNS        192,168,0,1
 #define WIFI_GATEWAY    192,168,0,1
 #define WIFI_SUBNET     255,255,255,0
-
-/* Node configuration */
-#define TIME_TO_SLEEP   (30 * 60)         /* Sleep interval in seconds */ 
-#define NODE_LOCATION   "<NODE_LOCATION>" /* Physical deployment location (e.g. livingroom, office, etc.) */ 
-#define NTP_SERVER      "pool.ntp.org"    /* https://www.ntppool.org/en/ */  

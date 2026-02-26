@@ -85,8 +85,7 @@ void init_hardware() {
   Serial.begin(115200);
   delay(1000);
 
-  /* SDA = GPIO21, SCL = GPIO22 */
-  Wire.begin(21, 22);
+  Wire.begin(I2C_SDA, I2C_SCL);
 
   if (!bme.begin(0x76) && !bme.begin(0x77)) {
     Serial.println("BME280 not found.");
