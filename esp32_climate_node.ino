@@ -27,19 +27,11 @@ RTC_DATA_ATTR uint8_t buffer_head = 0;    // Oldest entry
 RTC_DATA_ATTR uint8_t buffer_tail = 0;    // Next write position
 RTC_DATA_ATTR uint8_t buffer_count = 0;   // Number of stored entries
 
-/*
-TODO [Portability]:
-- Might migrate to ESP8266 due to implications when designing an enclosure for the ESP32 (missing screwholes on the board, cost, etc.).
-  * Replace WiFi.h with ESP8266WiFi.h
-  * Adjust HTTP client usage
-  * Update deep sleep implementation
-
-TODO [QoL]:
-- Consider improving the InfluxDB Line Protocol with new tags, e.g. device_id, etc.
-- Over-the-air update. If implemented, this would probably be after deployment and one of the last things to do. 
-  * Would require a web server on the network where the nodes can download the new firmware from (using a periodic check).
-  * Consider implementing a firmware_version tag (InfluxDB Line Protocol) for easy tracking of not updated nodes.
-*/
+/* TODO [QoL]:
+   - Consider improving the InfluxDB Line Protocol with new tags, e.g. device_id, etc.
+   - Over-the-air update. If implemented, this would probably be after deployment and one of the last things to do. 
+     * Would require a web server on the network where the nodes can download the new firmware from (using a periodic check).
+     * Consider implementing a firmware_version tag (InfluxDB Line Protocol) for easy tracking of not updated nodes. */
 
 void setup() {
   init_hardware();
@@ -79,12 +71,13 @@ void loop() {
 }
 
 void init_hardware() {
-  /* Initializes serial communication, I2C bus, and BME280 sensor. Halts execution if sensor initialization fails. */
+  /* Initializes serial communication, I2C bus, and BME280 sensor. 
+     Halts execution if sensor initialization fails. */
   DEBUG_BLOCK({
-    
+    Serial.begin(115200);
+    delay(500);
   });
-  Serial.begin(115200);
-  delay(500);
+
   Wire.begin(I2C_SDA, I2C_SCL);
 
   if (!bme.begin(0x76) && !bme.begin(0x77)) {
@@ -96,7 +89,7 @@ void init_hardware() {
 }
 
 bool connect_wifi() {
-  /* Attempts to connect to configured WiFi network (configured in config.h). Returns true if connection succeeds, otherwise false. */
+  /* Attempts to connect to configured WiFi network */
   #if USE_STATIC_IP
   WiFi.config(
     IPAddress (WIFI_STATIC_IP),
@@ -189,7 +182,7 @@ bool build_influx_payload(char* buffer, size_t size, const ClimateData& data) {
 
      NOTE:
      - The measurement name is required by InfluxDB and groups related metrics logically.
-     - The tag describes which location the node is deployed in, e.g. kitchen, bathroom, bedroom, or livingroom.
+     - The tag describes which location the node is deployed in.
      - The fields corresponds to each metric collected, i.e. temperature, humidity, and pressure. */
 
   time_t now = time(nullptr);
