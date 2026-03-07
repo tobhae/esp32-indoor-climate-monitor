@@ -145,7 +145,7 @@ void check_for_update() {
     DEBUG_PRINT("Remote firmware version: ");
     DEBUG_PRINTLN(remote_version);
 
-    if (strncmp(remote_version, FIRMWARE_VERSION) != 0) {
+    if (strcmp(remote_version, FIRMWARE_VERSION) != 0) {
         DEBUG_PRINTLN("New firmware available.");
         perform_update();
     } else {
