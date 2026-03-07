@@ -7,6 +7,7 @@
 #include <time.h>
 #include <config.h>
 #include <debug.h>
+#include <ota.h>
 
 /* Represents a single measurement sample */
 struct ClimateData {
@@ -27,12 +28,6 @@ RTC_DATA_ATTR uint8_t buffer_head = 0;    // Oldest entry
 RTC_DATA_ATTR uint8_t buffer_tail = 0;    // Next write position
 RTC_DATA_ATTR uint8_t buffer_count = 0;   // Number of stored entries
 
-/* TODO [QoL]:
-   - Consider improving the InfluxDB Line Protocol with new tags, e.g. device_id, etc.
-   - Over-the-air update. If implemented, this would probably be after deployment and one of the last things to do. 
-     * Would require a web server on the network where the nodes can download the new firmware from (using a periodic check).
-     * Consider implementing a firmware_version tag (InfluxDB Line Protocol) for easy tracking of not updated nodes. */
-
 void setup() {
   init_hardware();
   build_influxdb_url();
@@ -43,6 +38,10 @@ void setup() {
 
   if(!sync_time()) {
     enter_deep_sleep();
+  }
+
+  if(should_check_for_update) {
+    check_for_update();
   }
 
   ClimateData data = read_climate();
