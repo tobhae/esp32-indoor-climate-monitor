@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <Update.h>
 #include <string.h>
 
 #include "firmware_version.h"
@@ -7,6 +8,74 @@
 #include "ota.h"
 
 RTC_DATA_ATTR uint16_t wake_counter = 0;
+
+bool perform_update() {
+    DEBUG_PRINTLN("Starting OTA update...");
+
+    HTTPClient http;
+    http.begin(OTA_FIRMWARE_URL);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+    int httpCode = http.GET();
+
+    DEBUG_PRINT("HTTP code: ");
+    DEBUG_PRINTLN(httpCode);
+
+    if (httpCode != HTTP_CODE_OK) {
+        DEBUG_PRINTLN("Firmware download failed.");
+        http.end();
+        return false;
+    }
+
+    int content_length = http.getSize();
+
+    if (content_length <= 0) {
+        DEBUG_PRINTLN("Invalid firmware size.");
+        http.end();
+        return false;
+    }
+
+    DEBUG_PRINT("Firmware size: ");
+    DEBUG_PRINTLN(content_length);
+
+    WiFiClient* stream = http.getStreamPtr();
+
+    if (!Update.begin(content_length)) {
+        DEBUG_PRINTLN("OTA begin failed.");
+        http.end();
+        return false;
+    }
+
+    size_t written = Update.writeStream(*stream);
+
+    if (written != content_length) {
+        DEBUG_PRINTLN("OTA write incomplete.");
+        Update.abort();
+        http.end();
+        return false;
+    }
+
+    if (!Update.end()) {
+        DEBUG_PRINTLN("OTA end failed.");
+        http.end();
+        return false;
+    }
+
+    if (!Update.isFinished()) {
+        DEBUG_PRINTLN("OTA not finished.");
+        http.end();
+        return false;
+    }
+
+    DEBUG_PRINTLN("OTA update successful. Rebooting...");
+
+    http.end();
+
+    delay(1000);
+    ESP.restart();
+
+    return true;
+}
 
 /* Decide if OTA should check for update */
 bool should_check_for_update() {
@@ -70,7 +139,7 @@ void check_for_update() {
 
     if (strncmp(remote_version, FIRMWARE_VERSION, sizeof(remote_version)) != 0) {
         DEBUG_PRINTLN("New firmware available.");
-        // perform_update();
+        perform_update();
     } else {
         DEBUG_PRINTLN("Firmware is up to date.");
     }   
