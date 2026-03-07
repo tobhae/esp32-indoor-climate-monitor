@@ -1,13 +1,16 @@
+#include <time.h>
+
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <esp_sleep.h>
 #include <Wire.h>
+
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
-#include <esp_sleep.h>
-#include <time.h>
-#include <config.h>
-#include <debug.h>
-#include <ota.h>
+
+#include "config.h"
+#include "debug.h"
+#include "ota.h"
 
 /* Represents a single measurement sample */
 struct ClimateData {

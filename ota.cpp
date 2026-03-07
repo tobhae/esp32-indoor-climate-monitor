@@ -1,11 +1,13 @@
+#include "ota.h"
+
+#include <string.h>
+
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <Update.h>
-#include <string.h>
 
 #include "firmware_version.h"
 #include "debug.h"
-#include "ota.h"
 
 /* Provides Over-The-Air (OTA) firmware update functionality
    for the indoor climate monitor node.
