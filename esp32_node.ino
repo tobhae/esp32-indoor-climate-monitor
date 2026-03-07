@@ -7,6 +7,7 @@
 #include <time.h>
 #include <config.h>
 #include <debug.h>
+#include <ota.h>
 
 /* Represents a single measurement sample */
 struct ClimateData {
@@ -43,6 +44,10 @@ void setup() {
 
   if(!sync_time()) {
     enter_deep_sleep();
+  }
+
+  if(should_check_for_update) {
+    check_for_update();
   }
 
   ClimateData data = read_climate();
