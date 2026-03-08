@@ -1,2 +1,6 @@
 docker/.env
+docker/data
+docker/grafana
 config.h
+.pio/
+.vscode/

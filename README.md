@@ -20,17 +20,10 @@ Each node operates independently and can be deployed in different locations. Con
 
 ## Features
 #### Low-Power Operation
-The node is designed for long-term battery operation using a single 18650 Li-Ion cell.
-After completing a measurement and data transmission cycle, the ESP32 enters deep sleep
-for a configurable interval to minimize power consumption. WiFi is disabled before entering 
-sleep to further reduce current draw during idle periods.
+The node is designed for long-term battery operation using a single 18650 Li-Ion cell. After completing a measurement and data transmission cycle, the ESP32 enters deep sleep for a configurable interval to minimize power consumption. WiFi is disabled before entering sleep to further reduce current draw during idle periods.
 
 #### Reliable Time-Series Data
-Sensor data is transmitted to InfluxDB using the InfluxDB Line Protocol with explicit Unix timestamps.
-The node synchronizes its system clock with an NTP server to ensure accurate and consistent timestamps
-across all devices. This guarantees correct time-series ordering in the database, regardless of when the
-data is ingested. To handle temporary network outages, measurements that cannot be transmitted are stored
-in an RTC-backed circular buffer and sent during the next successful connection.
+Sensor data is transmitted to InfluxDB using the InfluxDB Line Protocol with explicit Unix timestamps. The node synchronizes its system clock with an NTP server to ensure accurate and consistent timestamps across all devices. This guarantees correct time-series ordering in the database, regardless of when the data is ingested. To handle temporary network outages, measurements that cannot be transmitted are stored in an RTC-backed circular buffer and sent during the next successful connection.
 
 #### Configuration Model
 The node is configured using a local `config.h` file that defines WiFi credentials, InfluxDB connection parameters, deployment location, and other runtime settings. This approach allows multiple nodes to be deployed
@@ -56,8 +49,6 @@ An ESP8266-compatible firmware variant is available in a separate branch: [esp82
 ### Planned Improvements
 - 3D-printable enclosure design for the node (_In progress_)
 - Rework `debug.h` with configurable log levels (`silent`, `info`, and `debug`)
-- Convert the firmware entry point from `.ino` to `.cpp`
-- Refactor core functionality into dedicated modules (e.g. `buffer.cpp`, `wifi.cpp`, etc.) 
 - Add additional metadata tags to transmitted data (device ID, firmware version, etc.)
 - Provide a comprehensive setup and deployment guide in the README
 - Maintain and improve ESP8266 compatibility

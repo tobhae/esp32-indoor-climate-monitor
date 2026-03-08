@@ -40,7 +40,7 @@
 #define USE_STATIC_IP   0
 
 /* Replace last octet with a free address in your LAN */
-#define WIFI_STATIC_IP  192,168,0,100
-#define WIFI_DNS        192,168,0,1
-#define WIFI_GATEWAY    192,168,0,1
-#define WIFI_SUBNET     255,255,255,0
+#define STATIC_IP_ADDR  192,168,0,100
+#define GATEWAY_ADDR    192,168,0,1
+#define SUBNET_ADDR     255,255,255,0
+#define DNS_ADDR        192,168,0,1
