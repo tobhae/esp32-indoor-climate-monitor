@@ -8,9 +8,6 @@
 #include "config.h"
 #include "debug.h"
 
-/* TODO: Remove while loop inside if-statement in init_hardware(); */
-/* TODO: Maybe move Serial/Wire begin to main.cpp */
-
 static Adafruit_BME280 bme;  // BME280 sensor instance (I2C)
 
 ClimateData read_climate() {
@@ -35,7 +32,9 @@ void init_hardware() {
 
   if (!bme.begin(0x76) && !bme.begin(0x77)) {
     DEBUG_PRINTLN("BME280 not found.");
-    while (1);
+    DEBUG_PRINTLN("Rebooting...");
+    delay(500);
+    ESP.restart();
   }
 
   DEBUG_PRINTLN("BME280 ready.");
