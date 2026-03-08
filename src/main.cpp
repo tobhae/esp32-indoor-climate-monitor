@@ -25,7 +25,7 @@ void setup() {
     enter_deep_sleep();
   }
 
-  if(should_check_for_update) {
+  if(should_check_for_update()) {
     check_for_update();
   }
 
