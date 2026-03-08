@@ -11,9 +11,9 @@ bool connect_wifi() {
   #if USE_STATIC_IP
   WiFi.config(
     IPAddress(STATIC_IP_ADDR),
-    IPAddress(DNS_ADDR),
     IPAddress(GATEWAY_ADDR),
-    IPAddress(SUBNET_ADRR));
+    IPAddress(SUBNET_ADDR),
+    IPAddress(DNS_ADDR));
   #endif
 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
