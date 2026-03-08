@@ -3,8 +3,7 @@
 #include <Arduino.h>
 
 #include "debug.h"
-
-/* TODO: flush_buffer uses a influxdb function call and need to be updated with its header when implemented. */
+#include "influx.h"
 
 /* RTC Buffer */
 RTC_DATA_ATTR char rtc_buffer[BUFFER_CAPACITY][PAYLOAD_SIZE];
