@@ -7,8 +7,6 @@
 /* TODO: flush_buffer uses a influxdb function call and need to be updated with its header when implemented. */
 
 /* RTC Buffer */
-#define BUFFER_CAPACITY 10
-#define PAYLOAD_SIZE 128
 RTC_DATA_ATTR char rtc_buffer[BUFFER_CAPACITY][PAYLOAD_SIZE];
 RTC_DATA_ATTR uint8_t buffer_head = 0;    // Oldest entry
 RTC_DATA_ATTR uint8_t buffer_tail = 0;    // Next write position
