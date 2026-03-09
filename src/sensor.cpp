@@ -8,21 +8,22 @@
 #include "config.h"
 #include "debug.h"
 
-static Adafruit_BME280 bme;  // BME280 sensor instance (I2C)
+/* BME280 sensor instance (I2C) */
+static Adafruit_BME280 bme;
 
+/* Reads temperature, humidity, and pressure from BME280. */
 ClimateData read_climate() {
-  /* Reads temperature, humidity, and pressure from BME280. */
   ClimateData data;
-  data.temperature = bme.readTemperature();
-  data.humidity = bme.readHumidity();
-  data.pressure = bme.readPressure() / 100.0F;
+  data.temperature = (int16_t)(bme.readTemperature() * TEMPERATURE_SCALE);
+  data.humidity = (uint16_t)(bme.readHumidity() * HUMIDITY_SCALE);
+  data.pressure = (uint16_t)((bme.readPressure() / 100.0f) * PRESSURE_SCALE);
 
   return data;
 }
 
+/* Initializes serial communication, I2C bus, and BME280 sensor. 
+   Restarts ESP32 if sensor initialization fails. */
 void init_hardware() {
-  /* Initializes serial communication, I2C bus, and BME280 sensor. 
-     Halts execution if sensor initialization fails. */
   DEBUG_BLOCK({
     Serial.begin(115200);
     delay(500);
