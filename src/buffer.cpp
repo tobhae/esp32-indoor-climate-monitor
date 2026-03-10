@@ -36,7 +36,7 @@ void buffer_pop() {
     return;
   }
 
-  buffer_head = (buffer_head + 1) % BUFFER_CAPACITY;
+  buffer_tail = (buffer_tail + 1) % BUFFER_CAPACITY;
   buffer_count--;
 
   DEBUG_PRINTLN("Buffer entry sent and removed.");
