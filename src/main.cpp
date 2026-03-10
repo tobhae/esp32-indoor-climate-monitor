@@ -32,20 +32,23 @@ void setup() {
   }
 
   ClimateData data = read_climate();
+  uint32_t timestamp = time(nullptr);
 
   char payload[PAYLOAD_SIZE];
 
-  if (!build_influx_payload(payload, sizeof(payload), data)) {
+  if (!build_influx_payload(payload, sizeof(payload), data, timestamp)) {
     enter_deep_sleep();
   }
 
   if (!flush_buffer()) {
-    buffer_push(payload);
+    ClimateSample sample{data, timestamp};
+    buffer_push(sample);
     enter_deep_sleep();
   }
 
   if (!post_influxdb(payload, strlen(payload))) {
-    buffer_push(payload);
+    ClimateSample sample{data, timestamp};
+    buffer_push(sample);
   } 
 
   enter_deep_sleep();

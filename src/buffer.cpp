@@ -1,80 +1,99 @@
 #include "buffer.h"
 
 #include <Arduino.h>
+#include <WiFi.h>
 
 #include "debug.h"
 #include "influx.h"
 
-/* RTC Buffer */
-RTC_DATA_ATTR char rtc_buffer[BUFFER_CAPACITY][PAYLOAD_SIZE];
-RTC_DATA_ATTR uint8_t buffer_head = 0;    // Oldest entry
-RTC_DATA_ATTR uint8_t buffer_tail = 0;    // Next write position
-RTC_DATA_ATTR uint8_t buffer_count = 0;   // Number of stored entries
+/* RTC circular buffer storing ClimateSample entires.
 
-bool buffer_push(const char* payload) {
-  /* Store a payload in the RTC buffer, overwriting oldest entry if full */
-  if (buffer_count >= BUFFER_CAPACITY) {
-    /* Buffer full, overwrite oldest entry */
-    buffer_head = (buffer_head + 1) % BUFFER_CAPACITY;
-    buffer_count--;
+   head: next write position
+   tail: oldest entry (next to be sent) 
+   count: number of valid samples currently stored */
+RTC_DATA_ATTR ClimateSample rtc_buffer[BUFFER_CAPACITY];
+RTC_DATA_ATTR uint8_t buffer_head = 0;
+RTC_DATA_ATTR uint8_t buffer_tail = 0;
+RTC_DATA_ATTR uint8_t buffer_count = 0;
+
+/* Store a ClimateSample in the RTC buffer, overwriting oldest entry if full */
+void buffer_push(const ClimateSample &sample) {
+  rtc_buffer[buffer_head] = sample;
+
+  /* Advance head to the next write position */
+  buffer_head = (buffer_head + 1) % BUFFER_CAPACITY;
+
+  if (buffer_count < BUFFER_CAPACITY) {
+    buffer_count++;
+  } else {
+    /* Buffer full, advance tail to oldest entry */
+    buffer_tail = (buffer_tail + 1) % BUFFER_CAPACITY;
   }
-
-  strncpy(rtc_buffer[buffer_tail], payload, PAYLOAD_SIZE - 1);
-  rtc_buffer[buffer_tail][PAYLOAD_SIZE - 1] = '\0';
-
-  buffer_tail = (buffer_tail  + 1) %  BUFFER_CAPACITY;
-  buffer_count++;
 
   /* Debugging */
-  DEBUG_PRINT("Buffer push count: ");
-  DEBUG_PRINTLN(buffer_count);
-  
-  return true;
+  DEBUG_BLOCK({
+    Serial.print("Push -> Head: ");
+    Serial.print(buffer_head);
+    Serial.print(" Tail: ");
+    Serial.print(buffer_tail);
+    Serial.print(" Count: ");
+    Serial.println(buffer_count);
+  });
 }
 
-const char* buffer_peek() {
-  /* Return pointer to oldest buffered payload without removing it (nullptr if empty) */
-  if (buffer_count == 0) {
-    return nullptr;
-  }
-
-  return rtc_buffer[buffer_head];
-}
-
+/* Remove the oldest sample from the RTC buffer */
 void buffer_pop() {
-  /* Remove the oldest payload from the RTC buffer */
   if (buffer_count == 0) {
     return;
   }
 
-  buffer_head = (buffer_head + 1) % BUFFER_CAPACITY;
+  /* Advance tail to remove oldest entry */
+  buffer_tail = (buffer_tail + 1) % BUFFER_CAPACITY;
   buffer_count--;
 
-  DEBUG_PRINTLN("Buffer entry sent and removed.");
+  /* Debugging prints */
+  DEBUG_BLOCK({
+    Serial.print("Pop  -> Head: ");
+    Serial.print(buffer_head);
+    Serial.print(" Tail: ");
+    Serial.print(buffer_tail);
+    Serial.print(" Count: ");
+    Serial.println(buffer_count);
+  });
 }
 
+/* Attempt to send all buffered samples in FIFO order.
+   Each ClimateSample is converted to an InfluxDB payload before sending. */
 bool flush_buffer() {
-  /* Attempt to send all buffered payloads in FIFO order */
+  if (WiFi.status() != WL_CONNECTED) {
+    DEBUG_PRINTLN("WiFi not connected, skipping buffer flush.");
+    return false;
+  }
+
+  char payload[PAYLOAD_SIZE];
+
   while (buffer_count > 0) {
-    const char* payload = buffer_peek();
+    ClimateSample &sample = rtc_buffer[buffer_tail];
 
     /* Debugging prints */
     DEBUG_PRINT("Flushing entry, remaining: ");
     DEBUG_PRINTLN(buffer_count);
 
+    /* Rebuild InfluxDB line protocol payload */
+    if (!build_influx_payload(payload, sizeof(payload), sample.data, sample.timestamp)) {
+      DEBUG_PRINT("Failed to build payload at buffer index: ");
+      DEBUG_PRINTLN(buffer_tail);
+      return false;
+    }
+
+    /* Send payload to InfluxDB */
     if (!post_influxdb(payload, strlen(payload))) {
+      DEBUG_PRINT("Failed to send payload at buffer index: ");
+      DEBUG_PRINTLN(buffer_tail);
       return false;
     }
 
     buffer_pop();
-
-    /* Debugging prints */
-    DEBUG_BLOCK({
-      Serial.print("Head: ");
-      Serial.println(buffer_head);
-      Serial.print("Tail: ");
-      Serial.println(buffer_tail);
-    });
   }
 
   return true;

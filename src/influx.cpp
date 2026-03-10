@@ -6,22 +6,21 @@
 
 #include "config.h"
 #include "debug.h"
+#include "buffer.h"
 
 /* Buffer for fully constructed InfluxDB write endpoint URL */
 char influx_url[256]; 
 
+/* Constructs the full InfluxDB write endpoint URL */
 void build_influxdb_url() {
-  /* Constructs the full InfluxDB write endpoint URL */
   snprintf(influx_url, sizeof(influx_url), 
            "%s/api/v2/write?org=%s&bucket=%s&precision=s",
            INFLUX_HOST, INFLUX_ORG, INFLUX_BUCKET);
 }
 
-bool build_influx_payload(char* buffer, size_t size, const ClimateData& data) {
-
-  /* Formats ClimateData into InfluxDB Line Protocol.
-
-     InfluxDB Line Protocol format:
+/* Formats ClimateData into InfluxDB Line Protocol. */
+bool build_influx_payload(char* payload, size_t size, const ClimateData& data, uint32_t timestamp) {
+  /* InfluxDB Line Protocol format:
 
      measurement, tag=value field1=value1, field2=value2, field3=value3 timestamp
 
@@ -30,17 +29,25 @@ bool build_influx_payload(char* buffer, size_t size, const ClimateData& data) {
      - The tag describes which location the node is deployed in.
      - The fields corresponds to each metric collected, i.e. temperature, humidity, and pressure. */
 
-  time_t now = time(nullptr);
+  /* Conversion from fixed-point integers to float */
+  float temperature = data.temperature / (float)TEMPERATURE_SCALE;
+  float humidity = data.humidity / (float)HUMIDITY_SCALE;
+  float pressure = data.pressure / (float)PRESSURE_SCALE;
 
-  int len = snprintf(buffer, size, 
-  "indoor_climate,location=%s temperature=%.2f,humidity=%.2f,pressure=%.2f %ld",
-  NODE_LOCATION, data.temperature, data.humidity, data.pressure, now);
+  int len = snprintf(payload, size, 
+  "climate,location=%s temp=%.2f,hum=%.2f,pres=%.2f %ld",
+  NODE_LOCATION, temperature, humidity, pressure, timestamp);
+
+  if (len < 0 || len >= size) {
+    DEBUG_PRINTLN("Payload construction failed. ");
+    return false;
+  }
 
   return (len > 0 && len < size);
 }
 
+/* Send provided Line Protocol payload to InfluxDB, returns true if HTTP response is successful (204). */
 bool post_influxdb(const char* payload, size_t len) {
-  /* Send provided Line Protocol payload to InfluxDB, returns true if HTTP response is successful (204). */
   if (WiFi.status() != WL_CONNECTED) {
     DEBUG_PRINTLN("WiFi connection failed.");
     return false;
