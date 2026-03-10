@@ -30,15 +30,6 @@ void buffer_push(const ClimateSample &sample) {
   
 }
 
-/* Return pointer to oldest buffered payload without removing it (nullptr if empty) */
-const char* buffer_peek() {
-  if (buffer_count == 0) {
-    return nullptr;
-  }
-
-  return rtc_buffer[buffer_head];
-}
-
 /* Remove the oldest payload from the RTC buffer */
 void buffer_pop() {
   if (buffer_count == 0) {
