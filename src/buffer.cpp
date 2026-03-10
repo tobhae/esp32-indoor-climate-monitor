@@ -5,44 +5,65 @@
 #include "debug.h"
 #include "influx.h"
 
-/* RTC Buffer */
-RTC_DATA_ATTR ClimateSample rtc_buffer[BUFFER_CAPACITY];
-RTC_DATA_ATTR uint8_t buffer_head = 0;    // Oldest entry
-RTC_DATA_ATTR uint8_t buffer_tail = 0;    // Next write position
-RTC_DATA_ATTR uint8_t buffer_count = 0;   // Number of stored entries
+/* RTC circular buffer storing ClimateSample entires.
 
-/* Store a payload in the RTC buffer, overwriting oldest entry if full */
+   head: next write position
+   tail: oldest entry (next to be sent) 
+   count: number of valid samples currently stored */
+RTC_DATA_ATTR ClimateSample rtc_buffer[BUFFER_CAPACITY];
+RTC_DATA_ATTR uint8_t buffer_head = 0;
+RTC_DATA_ATTR uint8_t buffer_tail = 0;
+RTC_DATA_ATTR uint8_t buffer_count = 0;
+
+/* Store a ClimateSample in the RTC buffer, overwriting oldest entry if full */
 void buffer_push(const ClimateSample &sample) {
   rtc_buffer[buffer_head] = sample;
 
+  /* Advance head to the next write position */
   buffer_head = (buffer_head + 1) % BUFFER_CAPACITY;
 
   if (buffer_count < BUFFER_CAPACITY) {
     buffer_count++;
   } else {
-    /* Buffer full, reset to element 0 */
+    /* Buffer full, advance tail to oldest entry */
     buffer_tail = (buffer_tail + 1) % BUFFER_CAPACITY;
   }
 
   /* Debugging */
-  DEBUG_PRINT("Buffer push count: ");
-  DEBUG_PRINTLN(buffer_count);
+  DEBUG_BLOCK({
+    Serial.print("Push -> Head: ");
+    Serial.print(buffer_head);
+    Serial.print(" Tail: ");
+    Serial.print(buffer_tail);
+    Serial.print(" Count: ");
+    Serial.println(buffer_count);
+  });
   
 }
 
-/* Remove the oldest payload from the RTC buffer */
+/* Remove the oldest sample from the RTC buffer */
 void buffer_pop() {
   if (buffer_count == 0) {
     return;
   }
 
+  /* Advance tail to remove oldest entry */
   buffer_tail = (buffer_tail + 1) % BUFFER_CAPACITY;
   buffer_count--;
 
-  DEBUG_PRINTLN("Buffer entry sent and removed.");
+  /* Debugging prints */
+  DEBUG_BLOCK({
+    Serial.print("Pop  -> Head: ");
+    Serial.print(buffer_head);
+    Serial.print(" Tail: ");
+    Serial.print(buffer_tail);
+    Serial.print(" Count: ");
+    Serial.println(buffer_count);
+  });
 }
 
-/* Attempt to send all buffered payloads in FIFO order */
+/* Attempt to send all buffered samples in FIFO order.
+   Each ClimateSample is converted to and InfluxDB payload before sending. */
 bool flush_buffer() {
   char payload[PAYLOAD_SIZE];
 
@@ -62,14 +83,6 @@ bool flush_buffer() {
     }
 
     buffer_pop();
-
-    /* Debugging prints */
-    DEBUG_BLOCK({
-      Serial.print("Head: ");
-      Serial.println(buffer_head);
-      Serial.print("Tail: ");
-      Serial.println(buffer_tail);
-    });
   }
 
   return true;
