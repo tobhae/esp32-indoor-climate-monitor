@@ -5,6 +5,8 @@
 
 #include <Adafruit_BME280.h>
 
+#include "firmware_version.h"
+#include "buffer.h"
 #include "config.h"
 #include "debug.h"
 
@@ -27,7 +29,17 @@ void init_hardware() {
   DEBUG_BLOCK({
     Serial.begin(115200);
     delay(500);
+
+    Serial.println("");
+    Serial.println("==== ESP32 Climate Node ====");
+    Serial.print("Firmware: ");
+    Serial.println(FIRMWARE_VERSION);
+    Serial.println("Build: " __DATE__ " " __TIME__);
+    Serial.println("============================");
+    Serial.println("");
   });
+
+
 
   Wire.begin(I2C_SDA, I2C_SCL);
 
