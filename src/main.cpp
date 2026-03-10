@@ -36,7 +36,7 @@ void setup() {
 
   char payload[PAYLOAD_SIZE];
 
-  if (!build_influx_payload(payload, sizeof(payload), data)) {
+  if (!build_influx_payload(payload, sizeof(payload), data, timestamp)) {
     enter_deep_sleep();
   }
 
