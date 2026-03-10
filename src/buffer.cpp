@@ -1,6 +1,7 @@
 #include "buffer.h"
 
 #include <Arduino.h>
+#include <WiFi.h>
 
 #include "debug.h"
 #include "influx.h"
@@ -62,8 +63,13 @@ void buffer_pop() {
 }
 
 /* Attempt to send all buffered samples in FIFO order.
-   Each ClimateSample is converted to and InfluxDB payload before sending. */
+   Each ClimateSample is converted to an InfluxDB payload before sending. */
 bool flush_buffer() {
+  if (WiFi.status() != WL_CONNECTED) {
+    DEBUG_PRINTLN("WiFi not connected, skipping buffer flush.");
+    return false;
+  }
+
   char payload[PAYLOAD_SIZE];
 
   while (buffer_count > 0) {
@@ -75,11 +81,15 @@ bool flush_buffer() {
 
     /* Rebuild InfluxDB line protocol payload */
     if (!build_influx_payload(payload, sizeof(payload), sample.data, sample.timestamp)) {
+      DEBUG_PRINT("Failed to build payload at buffer index: ");
+      DEBUG_PRINTLN(buffer_tail);
       return false;
     }
 
     /* Send payload to InfluxDB */
     if (!post_influxdb(payload, strlen(payload))) {
+      DEBUG_PRINT("Failed to send payload at buffer index: ");
+      DEBUG_PRINTLN(buffer_tail);
       return false;
     }
 
