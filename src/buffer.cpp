@@ -38,7 +38,6 @@ void buffer_push(const ClimateSample &sample) {
     Serial.print(" Count: ");
     Serial.println(buffer_count);
   });
-  
 }
 
 /* Remove the oldest sample from the RTC buffer */
@@ -74,10 +73,12 @@ bool flush_buffer() {
     DEBUG_PRINT("Flushing entry, remaining: ");
     DEBUG_PRINTLN(buffer_count);
 
+    /* Rebuild InfluxDB line protocol payload */
     if (!build_influx_payload(payload, sizeof(payload), sample.data, sample.timestamp)) {
       return false;
     }
 
+    /* Send payload to InfluxDB */
     if (!post_influxdb(payload, strlen(payload))) {
       return false;
     }
